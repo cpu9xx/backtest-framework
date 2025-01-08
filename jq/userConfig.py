@@ -7,9 +7,12 @@ userconfig = {
 }
 
 # userconfig = {
+#     "backtest":True,
+#     "extra_db":['hm_detail'],
 #     "if_load_data":True,
-#     "start":"2019-01-01",
-#     "end":"2019-06-30",
+#     # "start":"20220818",
+#     "start":"20250102",
+#     "end":"20250103",
 #     "start_cash":100000000
 # }
 
