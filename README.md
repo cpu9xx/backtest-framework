@@ -1,4 +1,5 @@
-# Version 1.1
+# Update
+## Version 1.1
 - Designed an efficient data structure (in object.py) for massive stock data and optimised the data query APIs, **significantly improved backtesting speed**.
 - Provided a new example strategy (in userStrategy.py), which is more complex and has a much bigger security pool than the double MA Strategy (in doublelines.py), to test the framework performance.
 - Optimised the Recorder module, now you can see details of the point if your mouse is near the pnl curves. Here is an example:
