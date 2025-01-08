@@ -1,4 +1,19 @@
 # Update
+## Version 2.0
+- Convertible bonds are supported.
+- Memory loading and saving are more efficient for live trading.
+- Strategy code will be automatically recorded in the log file when starting backtesting.
+- Customized data is supported, users can add any additional data when backtesting by adding the name of the database in "extra_db", userconfig.py.
+- 13 financial indicators will be displayed in the pnl figure after backtesting to help users understand the performance of their strategy. Here is an example:
+<p align="center">
+  <img src ="https://github.com/cpu9xx/LiquidQuant-backtest-framework/blob/main/userstrategypnl.png"/, width=500>
+</p>
+
+- Optimizated overall structure, executor.py was removed.
+- Improved order transaction rules, now backtesting results are more accurate.
+- Added more APIs.
+- Fixed some bugs.
+
 ## Version 1.1
 - Designed an efficient data structure (in object.py) for massive stock data and optimised the data query APIs, **significantly improved backtesting speed**.
 - Provided a new example strategy (in userStrategy.py), which is more complex and has a much bigger security pool than the double MA Strategy (in doublelines.py), to test the framework performance.
@@ -8,7 +23,7 @@
 </p>
 
 - Log will be automatically generated after backtesting.
-- Separated userconfig setting from the workplace, now you can edit backtesting params more comfortably.
+- Separated userconfig setting from the workplace, now user can edit backtesting params more comfortably.
 - Added more APIs.
 - Fixed some bugs.
 
