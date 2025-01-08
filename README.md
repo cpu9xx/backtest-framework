@@ -4,7 +4,7 @@
 - Memory loading and saving are more efficient for live trading.
 - Strategy code will be automatically recorded in the log file when starting backtesting.
 - Customized data is supported, users can add any additional data when backtesting by adding the name of the database in "extra_db", userconfig.py.
-- 13 financial indicators will be displayed in the pnl figure after backtesting to help users understand the performance of their strategy. Here is an example:
+- 13 financial indicators and autocorrelation of the number of holding curve will be displayed in the pnl figure after backtesting to help users understand the performance of their strategy. Here is an example:
 <p align="center">
   <img src ="https://github.com/cpu9xx/LiquidQuant-backtest-framework/blob/main/pnl_fft35.png"/, width=500>
 </p>
@@ -19,7 +19,7 @@
 - Provided a new example strategy (in userStrategy.py), which is more complex and has a much bigger security pool than the double MA Strategy (in doublelines.py), to test the framework performance.
 - Optimised the Recorder module, now you can see details of the point if your mouse is near the pnl curves. Here is an example:
 <p align="center">
-  <img src ="https://github.com/cpu9xx/LiquidQuant-backtest-framework/blob/main/userstrategypnl.png"/, width=500>
+  <img src ="https://github.com/cpu9xx/LiquidQuant-backtest-framework/blob/main/userstrategypnl.png"/, width=700>
 </p>
 
 - Log will be automatically generated after backtesting.
