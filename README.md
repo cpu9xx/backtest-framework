@@ -10,7 +10,8 @@
 - Separated userconfig setting from the workplace, now you can edit backtesting params more comfortably.
 - Added more APIs.
 - Fixed some bugs.
-2024-10-6 UPDATE
+
+2024-10-6
 
 # Objective
 This backtesting framework is designed for China's A-shares market, leveraging the advantages of Joinquant and Backtrader, based on my use experiences.
