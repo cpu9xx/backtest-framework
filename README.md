@@ -6,7 +6,7 @@
 - Customized data is supported, users can add any additional data when backtesting by adding the name of the database in "extra_db", userconfig.py.
 - 13 financial indicators will be displayed in the pnl figure after backtesting to help users understand the performance of their strategy. Here is an example:
 <p align="center">
-  <img src ="https://github.com/cpu9xx/LiquidQuant-backtest-framework/blob/main/userstrategypnl.png"/, width=500>
+  <img src ="https://github.com/cpu9xx/LiquidQuant-backtest-framework/blob/main/pnl_fft35.png"/, width=500>
 </p>
 
 - Optimizated overall structure, executor.py was removed.
