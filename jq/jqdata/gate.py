@@ -12,12 +12,23 @@ class MySQL_gate():
         self.db_config = kwargs
         self.StockSession = None
         self.IndexSession = None
+        self.LimitSession = None
+        self.HmDetailSession = None
+        self.CBDailySession = None
 
     def init_session(self, db):
         stock_engine = create_engine(f"mysql+mysqldb://{self.db_config['user']}:{self.db_config['password']}@{self.db_config['host']}/stock", pool_size=5)
         index_engine = create_engine(f"mysql+mysqldb://{self.db_config['user']}:{self.db_config['password']}@{self.db_config['host']}/index", pool_size=5)
+        limit_engine = create_engine(f"mysql+mysqldb://{self.db_config['user']}:{self.db_config['password']}@{self.db_config['host']}/limit", pool_size=5)
+        hm_detail_engine = create_engine(f"mysql+mysqldb://{self.db_config['user']}:{self.db_config['password']}@{self.db_config['host']}/hm_detail?charset=utf8mb4", pool_size=5)
+        cb_daily_engine = create_engine(f"mysql+mysqldb://{self.db_config['user']}:{self.db_config['password']}@{self.db_config['host']}/cb_daily", pool_size=5)
+        
         self.StockSession = sessionmaker(bind=stock_engine)
         self.IndexSession = sessionmaker(bind=index_engine)
+        self.LimitSession = sessionmaker(bind=limit_engine)
+        self.HmDetailSession = sessionmaker(bind=hm_detail_engine)
+        self.CBDailySession = sessionmaker(bind=cb_daily_engine)
+
         current_process = multiprocessing.current_process()
         print(f"{current_process.name} init_session db: {db}")
         return self.get_session(db)
@@ -32,6 +43,21 @@ class MySQL_gate():
             elif db == 'index':
                 if self.IndexSession is not None:
                     return self.IndexSession()
+                else:
+                    return self.init_session(db)
+            elif db == 'limit':
+                if self.LimitSession is not None:
+                    return self.LimitSession()
+                else:
+                    return self.init_session(db)
+            elif db == 'hm_detail':
+                if self.HmDetailSession is not None:
+                    return self.HmDetailSession()
+                else:
+                    return self.init_session(db)
+            elif db == 'cb_daily':
+                if self.CBDailySession is not None:
+                    return self.CBDailySession()
                 else:
                     return self.init_session(db)
             else:
@@ -53,6 +79,11 @@ class MySQL_gate():
     
     def read_df(self, tablename, db='stock'):
         query = f"SELECT * FROM `{tablename}` WHERE trade_date >= '{self.start_date}' AND trade_date <= '{self.end_date}';"
+        df = pd.DataFrame(self.execute_query(query, db, commit=False))
+        return df
+    
+    def read_entire_df(self, tablename, db='limit'):
+        query = f"SELECT * FROM `{tablename}`;"
         df = pd.DataFrame(self.execute_query(query, db, commit=False))
         return df
     

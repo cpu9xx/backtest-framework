@@ -1,5 +1,26 @@
 # -*- coding: utf-8 -*-
 from userConfig import userconfig, stock_column_tuple, index_column_tuple, db_config
+try:
+    from userConfig import cb_column_tuple
+except:
+    cb_column_tuple = (
+        #'ts_code', 'date', 'open', 'close'是必需的
+        ('ts_code', 'U11', 0),
+        ('date', 'datetime64[s]', 1), 
+        ('pre_close', 'float32', 2),
+        ('open', 'float32', 3),
+        ('high', 'float32', 4),
+        ('low', 'float32', 5),
+        ('close', 'float32', 6),
+        ('change', 'float32', 7),
+        ('pct_chg', 'float32', 8),
+        ('volume', 'float32', 9),
+        ('money', 'float32', 10),
+        ('bond_value', 'float32', 11),
+        ('bond_over_rate', 'float32', 12),
+        ('cb_value', 'float32', 13),
+        ('cb_over_rate', 'float32', 14),
+    )
 from .object import NumpyFrame, Index#, singleton
 from .events import EventBus
 from .gate import MySQL_gate
@@ -73,16 +94,15 @@ class KeyTransDict(dict):
         key = transform_key(key)
         return super().__contains__(key)
 
-import time
-def process_stock(stock):
-    print(f"{stock} data loading...", end="\r")
-    df = db_gate.read_df(stock, db='stock')
+def process_cb(cb):
+    print(f"{cb} data loading...", end="\r")
+    df = db_gate.read_df(cb, db='cb_daily')
     
     if df.empty:
         return
     
     loc_ls = []
-    for column in stock_column_tuple:
+    for column in cb_column_tuple:
         loc_ls.append(column[2])
         try:
             # 修改列名
@@ -96,7 +116,8 @@ def process_stock(stock):
     # 丢弃无关列
     df = df.iloc[:, loc_ls]
 
-    column, dtype = create_map_dtype(stock_column_tuple)
+    _, dtype = create_map_dtype(cb_column_tuple)
+
     array = np.array([tuple(row) for row in df.to_records(index=False)], dtype=dtype)
 
     date_set = set(df['date'])
@@ -125,7 +146,62 @@ def process_stock(stock):
     #         break
     #     except:
     #         time.sleep(0.2)
-    return stock, NumpyFrame(array, index_array=index_array, start_timestamp=start_timestamp)
+    return cb, NumpyFrame(array, cb, index_array=index_array, start_timestamp=start_timestamp)
+
+
+def process_stock(stock):
+    print(f"{stock} data loading...", end="\r")
+    df = db_gate.read_df(stock, db='stock')
+    
+    if df.empty:
+        return
+    
+    loc_ls = []
+    for column in stock_column_tuple:
+        loc_ls.append(column[2])
+        try:
+            # 修改列名
+            df.columns.values[column[2]] = column[0]
+        except KeyError:
+            raise KeyError(f"colume loc {column[2]} not found in {df.columns}")
+
+    df['ts_code'] = df['ts_code'].apply(trans_name)   
+    df['date'] = pd.to_datetime(df['date'])
+
+    # 丢弃无关列
+    df = df.iloc[:, loc_ls]
+
+    _, dtype = create_map_dtype(stock_column_tuple)
+
+    array = np.array([tuple(row) for row in df.to_records(index=False)], dtype=dtype)
+
+    date_set = set(df['date'])
+    all_dates = pd.date_range(start=df['date'].min(), end=df['date'].max())
+    start_timestamp = all_dates[0]
+    index_array = np.full(len(all_dates), -1, dtype=Index)
+    i = 0
+        
+    for timestamp in all_dates:
+        # offset: 第几天, i: 第几个交易日; 
+        offset = (timestamp - start_timestamp).days
+        assert i <= offset < len(index_array)
+        if timestamp in date_set:
+            index_array[offset] = Index(None, i, None, timestamp)
+            i += 1
+        else:
+            if i == 0:
+                index_array[offset] = Index(None, None, i, timestamp)
+            elif i < len(date_set):
+                index_array[offset] = Index(i-1, None, i, timestamp)
+            else:
+                index_array[offset] = Index(i-1, None, None, timestamp)
+    # for _ in range(60):
+    #     try:
+    #         env = Env.get_instance()
+    #         break
+    #     except:
+    #         time.sleep(0.2)
+    return stock, NumpyFrame(array, stock, index_array=index_array, start_timestamp=start_timestamp)
 
 def singleton(cls):
     instances = {}
@@ -150,8 +226,22 @@ class Env(object):
         self.current_dt = None
         self.trade_dates = None
         self.event_source = None
+
+        # 用户自定义列名
+        column, _ = create_map_dtype(stock_column_tuple)
+        self.stock_columns = set(column.keys())
+        self.stock_column_tuple = stock_column_tuple
+
+        cb_column, _ = create_map_dtype(cb_column_tuple)
+        self.cb_columns = set(cb_column.keys())
+        self.cb_column_tuple = cb_column_tuple
+        
         self.data = {}#KeyTransDict()
         self.index_data = {}#KeyTransDict()
+        self.cb_data = {}
+        # extra data
+        self.extra_db = self.usercfg.get('extra_db', [])
+        self.hm_detail = {}
 
     # @classmethod
     # def get_instance(cls):
@@ -171,12 +261,45 @@ class Env(object):
     def set_trade_dates(self, trade_dates):
         self.trade_dates = trade_dates
 
+    def need_cb_daily(self):
+        if len(self.cb_data) != 0:
+            # print(self.cb_data)
+            # raise
+            return True
+        else:
+            db_start_date="2017-01-01"
+            db_end_date="2030-01-01"
+            db_gate = MySQL_gate(
+                    start_date=db_start_date, 
+                    end_date=db_end_date, 
+                    # end_date="2017-02-01", 
+                    **db_config
+                )
+            if_load = self.usercfg['if_load_data']
+            if if_load:
+                current_folder_path = r"C:\Users\ccccc\AppData\Local\Programs\Python\Python38\Lib\site-packages\jqdata/"
+                with open(current_folder_path+'cb_daily.pkl', 'rb') as f:
+                    self.cb_data = pickle.load(f)
+            else:
+                import multiprocessing as mp
+                cb_ls = db_gate.get_tables(db='cb_daily').iloc[:, 0]
+                with mp.Pool(processes=mp.cpu_count()-1) as pool:
+                    results = pool.map(process_cb, cb_ls)
+                print(len(results))
+                for cb, result in results:
+                    self.cb_data[trans_name(cb)] = result
+
+                with open('cb_daily.pkl', 'wb') as f:
+                    pickle.dump(self.cb_data, f, protocol=4)
+
+        return False
+
     def load_data(self):
         env = Env()
 
         # 数据库中的数据时间范围
         db_start_date="2017-01-01"
-        db_end_date="2025-01-01"
+        db_end_date="2030-01-01"
         db_gate = MySQL_gate(
                 start_date=db_start_date, 
                 end_date=db_end_date, 
@@ -187,18 +310,24 @@ class Env(object):
         if_load = env.usercfg['if_load_data']
         if if_load:
             print(datetime.datetime.now())
-            # self.data = joblib.load('data.pkl', mmap_mode='r')
-            # with gzip.open('data.gz', 'rb') as f:
-            #     self.data = pickle.load(f)
-            with open('data.pkl', 'rb') as f:
+            # import os
+            current_folder_path = r"C:\Users\ccccc\AppData\Local\Programs\Python\Python38\Lib\site-packages\jqdata/"#os.path.dirname(__file__) + '/'
+
+
+            with open(current_folder_path+'data.pkl', 'rb') as f:
                 self.data = pickle.load(f)
             print(datetime.datetime.now())
-            # self.index_data = joblib.load('index_data.pkl', mmap_mode='r')
-            # with gzip.open('index_data.gz', 'rb') as f:
-            #     self.index_data = pickle.load(f)
-            with open('index_data.pkl', 'rb') as f:
+
+            with open(current_folder_path+'index_data.pkl', 'rb') as f:
                 self.index_data = pickle.load(f)
-            print(datetime.datetime.now())
+            
+            for db in self.extra_db:
+                with open(current_folder_path+f'{db}.pkl', 'rb') as f:
+                    setattr(self, db, pickle.load(f))
+
+
+            # for numpyframe in self.data.values():
+            #     print(numpyframe.data.flags['C_CONTIGUOUS'])
             # self._dump_data()
             # dt7 = datetime.datetime(2016, 10, 17)
             # dt6 = datetime.datetime(2016, 9, 17)
@@ -301,6 +430,17 @@ class Env(object):
                 df.set_index('trade_date', inplace=True)
                 self.index_data[trans_name(index)] = df
 
+            for db in self.extra_db:
+                table_ls = db_gate.get_tables(db=db).iloc[:, 0]
+                for table in table_ls:
+                    print(f"{db}.{table} data loading...", end="\r")
+                    df = db_gate.read_entire_df(table, db=db)
+                    if df.empty:
+                        continue
+                    if not hasattr(self, db):
+                        raise ValueError(f"extra db: {db} must in {self.extra_db}")
+                    getattr(self, db)[table] = df
+
             self._dump_data()
             pass
 
@@ -313,8 +453,13 @@ class Env(object):
             pickle.dump(self.data, f, protocol=4)
         with open('index_data.pkl', 'wb') as f:
             pickle.dump(self.index_data, f, protocol=4)
-        with gzip.open('data.gz', 'wb') as f:
-            pickle.dump(self.data, f, protocol=pickle.HIGHEST_PROTOCOL)
-        with gzip.open('index_data.gz', 'wb') as f:
-            pickle.dump(self.index_data, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+        for db in self.extra_db:    
+            with open(f'{db}.pkl', 'wb') as f:
+                pickle.dump(getattr(self, db), f, protocol=4)
+        # with gzip.open('data.gz', 'wb') as f:
+        #     pickle.dump(self.data, f, protocol=pickle.HIGHEST_PROTOCOL)
+        # with gzip.open('index_data.gz', 'wb') as f:
+        #     pickle.dump(self.index_data, f, protocol=pickle.HIGHEST_PROTOCOL)
             

@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import pandas as pd
 import numpy as np
+from functools import lru_cache
+
 from .Env import Env
 from .events import Event, EVENT
 from .logger import log
@@ -29,16 +31,29 @@ def run_daily(func, time, reference_security='000300.XSHG'):
 def get_bars(security, count, unit='1d', fields=['close'], include_now=False, end_dt=None, fq_ref_date=None, df=False):
     return _data._get_bars(security, count, unit, fields, include_now, end_dt, fq_ref_date, df)
 
+def get_cb_price(security, start_date=None, end_date=None, frequency='daily', fields=None, skip_paused=False, fq='post', count=None, panel=False, fill_paused=True, df=True):
+    return _data._get_cb_price(security, start_date, end_date, frequency, fields, skip_paused, fq, count, panel, fill_paused, df)
 
-# 取不到退市数据，性能差, 包含end_date当天数据
+# 取不到退市数据，包含end_date当天数据
 def get_price(security, start_date=None, end_date=None, frequency='daily', fields=None, skip_paused=False, fq='post', count=None, panel=False, fill_paused=True, df=True):
     return _data._get_price(security, start_date, end_date, frequency, fields, skip_paused, fq, count, panel, fill_paused, df)
 
-def get_all_securities(types='stock'):
+def get_all_securities(types=['stock']):
     return _data._get_all_securities(types)
 
 def get_all_trade_days():
     return _data._get_all_trade_days()
+
+def get_hm_detail(date):
+    return _data._get_hm_detail(date)
+
+@lru_cache(maxsize=8192)
+def trans_name(name):
+    if name.lower().endswith('sz') or name.lower().endswith('SZ'):
+        return name[:-2] + 'XSHE'
+    elif name.lower().endswith('sh') or name.lower().endswith('SH'):
+        return name[:-2] + 'XSHG'
+    return name
 
 # 取不到退市数据，不包含当日数据,即使是在收盘后
 def history(count, unit='1d', field='avg', security_list=None, df=True, skip_paused=False, fq='pre'):
@@ -46,6 +61,18 @@ def history(count, unit='1d', field='avg', security_list=None, df=True, skip_pau
 
 def filter_kcbj_stock(stock_list):
     return _data._filter_kcbj_stock(stock_list)
+
+def b_filter(stock_list):
+    return _data._b_filter(stock_list)
+
+def bj_filter(stock_list):
+    return _data._bj_filter(stock_list)
+
+def kc_filter(stock_list):
+    return _data._kc_filter(stock_list)
+
+def cy_filter(stock_list):
+    return _data._cy_filter(stock_list)
 ##################################### data ################################
 
 

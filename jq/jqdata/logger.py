@@ -6,22 +6,31 @@ class Log:
             self._env = Env.get_instance()
         except:
             self._env = None
+        self.order = True
 
     def set_env(self, environment):
         self._env = environment
 
-    def set_level(self, *val):
+    def set_level(self, name, level):
+        setattr(self, name, False)
         self.warning("暂不支持设置日志级别")
 
-    def info(self, message):
-        print(f"--{self._env.current_dt} : {message}")
+    def info(self, *messages):
+        combined_message = ' '.join(map(str, messages))
+        print(f"--{self._env.current_dt} : {combined_message}")
+
+    def orderinfo(self, *messages):
+        if self.order:
+            combined_message = ' '.join(map(str, messages))
+            print(f"\033[90m--{self._env.current_dt} : {combined_message}\033[0m")
 
     def error(self, message):
         print(f"--{self._env.current_dt} : {message}")
         raise Exception(message)
     
-    def warning(self, message):
-        print(f"\033[31m--{self._env.current_dt} : {message}\033[0m")
+    def warning(self, *messages):
+        combined_message = ' '.join(map(str, messages))
+        print(f"\033[31m--{self._env.current_dt} : {combined_message}\033[0m")
 
     def test(self, *messages):
         combined_message = ' '.join(map(str, messages))

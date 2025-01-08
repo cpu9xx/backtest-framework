@@ -22,27 +22,41 @@ class Scheduler(object):
         self.event_src = defaultdict(lambda: defaultdict(list))
         # self._frequency = frequency
         env = Env()
-        self.start = datetime.datetime.strptime(env.usercfg['start'], "%Y-%m-%d")
-        self.end = datetime.datetime.strptime(env.usercfg['end'], "%Y-%m-%d")
+        self.start = datetime.datetime.strptime(env.usercfg['start'], "%Y%m%d")
+        self.end = datetime.datetime.strptime(env.usercfg['end'], "%Y%m%d")
         event_bus = env.event_bus
         event_bus.add_listener(EVENT.TIME, self._run_before_open)
         event_bus.add_listener(EVENT.TIME, self._run_open)
         event_bus.add_listener(EVENT.TIME, self._run_close)
         event_bus.add_listener(EVENT.TIME, self._run_after_close)
+
+        self.finished_necessarily = False
         # event_bus.add_listener(EVENT.BEFORE_TRADING, self.before_trading_)
         # event_bus.add_listener(EVENT.BAR, self.next_bar_)
 
     def set_user_context(self, ucontext):
         self._ucontext = ucontext
 
-    def _run_daily(self, func, time, reference_security):
-        env = Env()
-
-        trade_dates = env.index_data[reference_security].loc[self.start:self.end, :].index
+    def _necessarily(self, trade_dates):
         # FIRST_TICK触发初始化
         first_tick_time = trade_dates[0] + datetime.timedelta(days=0, hours=TIME.OPEN.hour, minutes=TIME.OPEN.minute)
         self.event_src[trade_dates[0]][TIME.OPEN].append(Event(EVENT.FIRST_TICK, func=None, time=first_tick_time))
+        for date in trade_dates:
+            # 告诉 broker开盘了, 处理积压订单
+            self.event_src[date][TIME.OPEN].append(Event(EVENT.MARKET_OPEN, func=None, time=date + datetime.timedelta(days=0, hours=TIME.OPEN.hour, minutes=TIME.OPEN.minute)))
+            # 告诉 broker收盘了, 处理未成交订单
+            self.event_src[date][TIME.CLOSE].append(Event(EVENT.MARKET_CLOSE, func=None, time=date + datetime.timedelta(days=0, hours=TIME.CLOSE.hour, minutes=TIME.CLOSE.minute)))
+            # 卖单对应的仓位结算
+            self.event_src[date][TIME.DAY_END].append(Event(EVENT.DAY_END, func=None, time=date + datetime.timedelta(days=0, hours=TIME.DAY_END.hour, minutes=TIME.DAY_END.minute)))
 
+    def _run_daily(self, func, time, reference_security):
+        env = Env()
+        trade_dates = env.index_data[reference_security].loc[self.start:self.end, :].index
+        trade_dates = trade_dates.to_pydatetime().tolist()
+        if not self.finished_necessarily:
+            self._necessarily(trade_dates)
+            self.finished_necessarily = True
+        
         for date in trade_dates:
             time_type = getattr(TIME, time.upper())
             t = date + datetime.timedelta(days=0, hours=time_type.hour, minutes=time_type.minute)
@@ -54,12 +68,14 @@ class Scheduler(object):
         event_bus = env.event_bus
         # for i in range((self.end - self.start).days + 1): 
         #     date = self.start + datetime.timedelta(days=i)
-        for date in env.trade_dates:
+        trade_dates = env.trade_dates.to_pydatetime().tolist()
+        for date in trade_dates:
             events_dict = self.event_src.get(date, {})
             for time_type in TIME:
                 events = events_dict.get(time_type, [])
                 for event in events:
                     time = event.__dict__['time']
+                    assert time_type.value == time.time()
                     if self._ucontext.current_dt:
                         assert time >= self._ucontext.current_dt
                         if time.date() > self._ucontext.current_dt.date():
@@ -80,7 +96,7 @@ class Scheduler(object):
             self._ucontext.current_dt = aft_close_time
             env.current_dt = aft_close_time
 
-            event_bus.publish_event(Event(EVENT.MARKET_CLOSE))
+            # event_bus.publish_event(Event(EVENT.MARKET_CLOSE))
             
     def _run_before_open(self, event):
         time = event.__dict__['time']

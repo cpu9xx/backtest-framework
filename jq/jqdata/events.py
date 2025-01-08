@@ -35,10 +35,13 @@ class EVENT(Enum):
     FUTURE = 'future'
     #事件
     TIME = 'time'
-    
+    TRADE = 'trade'
     STOCK_ORDER = 'stock_order'
+    MARKET_OPEN ='market_open'
     MARKET_CLOSE ='market_close'
     FIRST_TICK = 'first_tick'
+    RECORD_TRADE = 'record_trade'
+    DAY_END = 'day_end'
     # GET_TRADES = 'get_trades'
 
 # print(parse_event('stock'))   # 输出: EVENT.STOCK

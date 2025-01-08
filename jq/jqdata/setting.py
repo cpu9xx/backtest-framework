@@ -39,8 +39,8 @@ class Setting(object):
 
     def _set_trade_dates(self, benchmark):
         env = Env()
-        start = datetime.datetime.strptime(env.usercfg['start'], "%Y-%m-%d")
-        end = datetime.datetime.strptime(env.usercfg['end'], "%Y-%m-%d")
+        start = datetime.datetime.strptime(env.usercfg['start'], "%Y%m%d")
+        end = datetime.datetime.strptime(env.usercfg['end'], "%Y%m%d")
         trade_dates = env.index_data[benchmark].loc[start:end, :].index
         env.set_trade_dates(trade_dates)
     

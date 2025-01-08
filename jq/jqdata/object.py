@@ -1,3 +1,5 @@
+from userConfig import userconfig
+
 import numpy as np
 import pandas as pd
 from typing import Union
@@ -6,22 +8,32 @@ from enum import Enum
 
 class OrderStatus(Enum):
     open = 0
-    partly_filled = 1
+    filled = 1
     canceled = 2
     rejected = 3
-    done = 4
-    held = 6
+    held = 4
     expired = 5
     new = 8
     pending_cancel = 9
 
+    def __repr__(self):
+        return self.name
+    
+    def __str__(self):
+        return self.name
+
 class TIME(Enum):
+    # 必须按照时间先后, 从上到下排序, scheduler要遍历
+    # (OPEN, CLOSE] 按收盘价成交
+    DAY_START = datetime.time(0, 0)
     BEFORE_OPEN = datetime.time(9, 0)
     OPEN = datetime.time(9, 30)
+    # 14:57 集合竞价开始
+    BEFORE_CLOSE = datetime.time(14, 57)
     CLOSE = datetime.time(15, 0)
     AFTER_CLOSE = datetime.time(15, 30)
     DAY_END = datetime.time(23, 59)
-    DAY_START = datetime.time(23, 59)
+    
 
     @property
     def hour(self):
@@ -49,12 +61,13 @@ class Index:
         
 
 class NumpyFrame:
-    def __init__(self, array, index_array=None, start_timestamp=None):
+    def __init__(self, array, name, index_array=None, start_timestamp=None):
         self.data = array
         
         self.index = index_array
         # self.column = column
         self.start_timestamp = start_timestamp
+        self.name = name
         
     
     # def loc(self, index, column):
@@ -178,19 +191,45 @@ class NumpyFrame:
 
                 
                 return self.data[columns][slice_index], (dt_start, dt_stop)
-            elif isinstance(index, pd.Timestamp):
-                offset = (index - self.start_timestamp).days
-                int_index = self.index[offset]
-                if int_index.this is not None:
-                    int_index = int_index.this
-                else:
-                    from .logger import log
-                    log.warning(f"Index {index} is not a valid trading day, Index: {self.index[offset]}, returning data for previous trading day")
-                    int_index = int_index.prev
-                # index为int时, 先通过字段名访问columns，再通过索引访问index, 速度会快一倍, 而index为slice时速度没区别
-                return self.data[columns][int_index], index
             else:
-                raise IndexError("Invalid index type: {index}")
+                if isinstance(index, datetime.date) or isinstance(index, datetime.datetime):
+                    index = pd.Timestamp(index)
+                    
+                if isinstance(index, pd.Timestamp):
+                    offset = (index - self.start_timestamp).days
+
+                    #已退市
+                    if offset >= len(self.index):
+                        from .logger import log
+                        log.warning(f"{self.name} 未来没有数据了, 返回 (0, {index})")
+                        log.warning(f"{self.name} last_data: {self.data[-1]}, offset: {offset}, len_index: {len(self.index)}")
+                        return 0, index
+                    elif userconfig['backtest']:
+                        # pass
+                        if offset >= len(self.index)-30:
+                            if self.name[0] == '3':
+                                from .logger import log
+                                log.warning(f"{self.name} 疑似进入30天退市整理期, 务必检查, 返回 (0, {index})")
+                                return 0, index
+                            elif offset >= len(self.index)-15 and self.name[0] != '3':
+                                from .logger import log
+                                log.warning(f"{self.name} 疑似进入15天退市整理期, 务必检查, 返回 (0, {index})")
+                                return 0, index
+
+                    int_index = self.index[offset]
+                    if int_index.this is not None:
+                        int_index = int_index.this
+                        data_dt = Index
+                    else:
+                        from .logger import log
+                        # log.warning(f"{self.name} Index {index} is not a valid trading day, Index: {self.index[offset]}, returning data for previous trading day")
+                        int_index = int_index.prev
+                        data_dt = self.data['date'][int_index] 
+                    # index为int时, 先通过字段名访问columns，再通过索引访问index, 速度会快一倍, 而index为slice时速度没区别
+                    
+                    return self.data[columns][int_index], data_dt
+                else:
+                    raise IndexError("Invalid index type: {index}")
 
         # print(columns)
         # 处理列映射
@@ -218,7 +257,7 @@ class NumpyFrame:
         state = {
             'data': self.data,  # Convert NumPy array to bytes
             'index': self.index,
-            # 'column': self.column,
+            'name': self.name,
             'start_timestamp': self.start_timestamp.timestamp()
         }
         return state
@@ -237,7 +276,7 @@ class NumpyFrame:
         # print(data.shape)
         object.__setattr__(self, "data", state['data'])
         object.__setattr__(self, "index", state['index'])
-        # object.__setattr__(self, "column", state['column'])
+        object.__setattr__(self, "name", state['name'])
         # print(pd.to_datetime(state['start_timestamp'], unit='s'))
         object.__setattr__(self, "start_timestamp", pd.to_datetime(state['start_timestamp'], unit='s'))
         # self.index = state['index']
