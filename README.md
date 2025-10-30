@@ -1,3 +1,8 @@
+自2025-02 起，此项目后续更新不再开源，如果需要最新版本或技术支持，请与作者联系 weipuchenn@gmail.com
+
+Starting from February 2025, future updates for this project will no longer be open source. If you need the latest version or usage assistance, please contact the author at weipuchenn@gmail.com.
+
+
 # Update
 ## Version 2.0
 - Convertible bonds are supported.
